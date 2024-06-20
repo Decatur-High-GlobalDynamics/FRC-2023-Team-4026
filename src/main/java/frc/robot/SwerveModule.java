@@ -120,7 +120,7 @@ public class SwerveModule
     private void configAngleEncoder()
     {
         angleEncoder.configFactoryDefault();
-        CANCoderUtil.setCANCoderBusUsage(angleEncoder, CCUsage.kMinimal);
+        CANCoderUtil.setCANCoderBusUsage(angleEncoder, CCUsage.kAll);
         angleEncoder.configAllSettings(Robot.ctreConfigs.swerveCanCoderConfig);
     }
 
@@ -137,7 +137,8 @@ public class SwerveModule
         angleController.setD(Constants.Swerve.angleKD);
         angleController.setFF(Constants.Swerve.angleKF);
         mAngleMotor.enableVoltageCompensation(Constants.Swerve.voltageComp);
-        mAngleMotor.burnFlash(); // writes configurations to flash memory so they save if a PDP breaker trips
+        mAngleMotor.burnFlash(); // writes configurations to flash memory so they save if a PDP
+                                 // breaker trips
         resetToAbsolute();
     }
 

@@ -4,6 +4,9 @@
 
 package frc.robot;
 
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.AnalogGyro;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.Joystick;
@@ -12,9 +15,12 @@ import edu.wpi.first.wpilibj.DoubleSolenoid.Value;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.commands.SetElevatorTargetCommand;
 import frc.robot.commands.SetElevatorTargetOverrideCommand;
+import frc.robot.autos.AutoBalanceAuto;
 import frc.robot.autos.DriveDistanceAuto;
+import frc.robot.autos.GoodDriveDistanceAuto;
 import frc.robot.commands.ClawGrabberCommand;
 import frc.robot.commands.ExampleCommand;
 import frc.robot.commands.SetClawThresholdOverrideCommand;
@@ -41,292 +47,357 @@ import edu.wpi.first.wpilibj2.command.button.POVButton;
  */
 public class RobotContainer {
 
-  public static RobotContainer instance;
+        public static RobotContainer instance;
 
-  public SwerveDriveSubsystem swerveDrive = new SwerveDriveSubsystem();
-  // TODO: uncomment Robot.java code when swerve is done
-  // public ClawIntakeSubsystem clawIntake = new ClawIntakeSubsystem();
-  // public ElevatorSubsystem elevator = new ElevatorSubsystem(clawIntake);;
-  // public VisionSubsystem vision = new VisionSubsystem();
+        public SwerveDriveSubsystem swerveDrive = new SwerveDriveSubsystem();
+        public ClawIntakeSubsystem clawIntake = new ClawIntakeSubsystem();
+        public ElevatorSubsystem elevator = new ElevatorSubsystem(clawIntake);;
+        public VisionSubsystem vision = new VisionSubsystem();
 
-  public Joystick primaryController;
-  public Joystick secondaryController;
+        public Joystick primaryController;
+        public Joystick secondaryController;
 
-  public static ShuffleboardTab shuffleboard = Shuffleboard.getTab("SmartDashboard");
+        public static ShuffleboardTab shuffleboard = Shuffleboard.getTab("SmartDashboard");
 
-  // The robot's subsystems and commands are defined here...
-  private final ExampleSubsystem m_exampleSubsystem = new ExampleSubsystem();
+        // The robot's subsystems and commands are defined here...
+        private final ExampleSubsystem m_exampleSubsystem = new ExampleSubsystem();
 
-  private final ExampleCommand m_autoCommand = new ExampleCommand(m_exampleSubsystem);
+        private final ExampleCommand m_autoCommand = new ExampleCommand(m_exampleSubsystem);
 
-  /**
-   * The container for the robot. Contains subsystems, OI devices, and commands.
-   */
-  public RobotContainer() {
-    // shuffleboard = Shuffleboard.getTab("SmartDashboard");
+        SendableChooser<Command> autoChooser;
 
-    shuffleboard.addDouble("Gyro", () -> swerveDrive.gyro.getAngle());
+        /**
+         * The container for the robot. Contains subsystems, OI devices, and commands.
+         */
+        public RobotContainer() {
+                // shuffleboard = Shuffleboard.getTab("SmartDashboard");
 
-    secondaryController = new Joystick(2); // We need this for testing in elevator
+                SmartDashboard.putBoolean("Invert Swerve", false);
 
-    // Configure the button bindings
-    configurePrimaryBindings();
-    // configureSecondaryBindings();
+                swerveDrive.setAngleOffsets(SmartDashboard.getBoolean("Invert Swerve",
+                                Constants.Swerve.DEFAULT_ANGLE_INVERT));
 
-    instance = this;
-  }
+                shuffleboard.addDouble("Gyro", () -> swerveDrive.gyro.getYaw());
 
-  /**
-   * Use this method to define your button->command mappings. Buttons can be
-   * created by
-   * instantiating a {@link GenericHID} or one of its subclasses
-   * ({@link edu.wpi.first.wpilibj.Joystick} or {@link XboxController}), and then
-   * passing it to a
-   * {@link edu.wpi.first.wpilibj2.command.button.JoystickButton}.
-   */
-  private void configurePrimaryBindings() {
-    primaryController = new Joystick(1);
+                autoChooser = new SendableChooser<>();
 
-    // JoystickButton a = new
-    // JoystickButton(primaryController,LogitechControllerButtons.a);
-    // JoystickButton b = new
-    // JoystickButton(primaryController,LogitechControllerButtons.b);
-    JoystickButton x = new JoystickButton(primaryController, LogitechControllerButtons.x);
-    JoystickButton y = new JoystickButton(primaryController, LogitechControllerButtons.y);
-    JoystickButton bumperLeft = new JoystickButton(primaryController,
-        LogitechControllerButtons.bumperLeft);
-    JoystickButton bumperRight = new JoystickButton(primaryController,
-        LogitechControllerButtons.bumperRight);
-    JoystickButton triggerLeft = new JoystickButton(primaryController,
-        LogitechControllerButtons.triggerLeft);
-    JoystickButton triggerRight = new JoystickButton(primaryController,
-        LogitechControllerButtons.triggerRight);
-    // JoystickButton up = new
-    // JoystickButton(primaryController,LogitechControllerButtons.up);
-    // JoystickButton down = new
-    // JoystickButton(primaryController,LogitechControllerButtons.down);
-    // JoystickButton left = new
-    // JoystickButton(primaryController,LogitechControllerButtons.left);
-    // JoystickButton right = new
-    // JoystickButton(primaryController,LogitechControllerButtons.right);
+                autoChooser.setDefaultOption("Charge Station", chargeStationAuto);
+                autoChooser.addOption("Exit Community", exitCommunityAuto);
 
-    swerveDrive
-        // vertical axis of left joystick -> translation
-        .setDefaultCommand(new TeleopSwerveCommand(swerveDrive, () -> -primaryController.getY(),
-            () -> -primaryController.getX(), // horizontal axis of left joystick-> strafe
-            // we want horizontal of right stick, if not twist, then change
-            () -> -primaryController.getTwist()
-        /* ()->y.getAsBoolean() owen doesn't want a button to turn field-relative off */
-        ));
+                shuffleboard.addDouble("Yaw Gyro", () -> swerveDrive.gyro.getYaw());
+                shuffleboard.addDouble("Pitch Gyro", () -> swerveDrive.gyro.getRoll());
 
-    x.onTrue(new InstantCommand(() -> swerveDrive.zeroGyro()));
-    y.onTrue(new InstantCommand(() -> {
-      for (SwerveModule mod : swerveDrive.mSwerveMods)
-        mod.resetToAbsolute();
-    }));
+                shuffleboard.addDouble("Gyro Offset", () -> swerveDrive.gyroOffset);
 
-  }
+                shuffleboard.add(autoChooser);
 
-  // private void configureSecondaryBindings() {
-  // // secondaryController = new Joystick(2);
+                // shuffleboard.add("Get Angle Offsets", new InstantCommand(() -> {
+                //         System.out.println("Getting angle offsets...");
 
-  // elevator.setDefaultCommand(new MoveElevatorCommand(() ->
-  // -secondaryController.getY(),
-  // elevator));
+                //         for (int i = 0; i < swerveDrive.mSwerveMods.length; i++) {
+                //                 double degrees = swerveDrive.mSwerveMods[i].getCanCoder()
+                //                                 .getDegrees();
+                //                 System.out.println("Setting mod " + i + " to " + degrees + "...");
+                //                 Constants.Swerve.ANGLE_OFFSETS[i] = degrees;
+                //         }
 
-  // JoystickButton a = new
-  // JoystickButton(secondaryController,LogitechControllerButtons.a);
-  // JoystickButton b = new
-  // JoystickButton(secondaryController,LogitechControllerButtons.b);
-  // JoystickButton x = new
-  // JoystickButton(secondaryController,LogitechControllerButtons.x);
-  // JoystickButton y = new
-  // JoystickButton(secondaryController,LogitechControllerButtons.y);
-  // JoystickButton bumperLeft = new
-  // JoystickButton(secondaryController,LogitechControllerButtons.bumperLeft);
-  // JoystickButton bumperRight = new
-  // JoystickButton(secondaryController,LogitechControllerButtons.bumperRight);
-  // JoystickButton triggerLeft = new
-  // JoystickButton(secondaryController,LogitechControllerButtons.triggerLeft);
-  // JoystickButton triggerRight = new
-  // JoystickButton(secondaryController,LogitechControllerButtons.triggerRight);
-  // POVButton up = new
-  // POVButton(secondaryController,LogitechControllerButtons.up);
-  // POVButton down = new
-  // POVButton(secondaryController,LogitechControllerButtons.down);
-  // POVButton left = new
-  // POVButton(secondaryController,LogitechControllerButtons.left);;
-  // POVButton right = new
-  // POVButton(secondaryController,LogitechControllerButtons.right);
-  // JoystickButton start = new JoystickButton(secondaryController,
-  // LogitechControllerButtons.start);
+                //         swerveDrive.setAngleOffsets(false);
+                // }));
 
-  // a.whileTrue(new ClawGrabberCommand(Value.kForward, clawIntake, true));
-  // b.whileTrue(new ClawGrabberCommand(Value.kReverse, clawIntake, false));
-  // // new IntakeMotorCommand( () -> bumperRight.getAsBoolean(),clawIntake);
+                secondaryController = new Joystick(2); // We need this for testing in elevator
 
-  // up.onTrue(new SetElevatorTargetCommand(Constants.topElevatorTargetPosition,
-  // elevator));
-  // left.onTrue(new SetElevatorTargetCommand(Constants.carryElevatorPos,
-  // elevator));
-  // right.onTrue(new
-  // SetElevatorTargetCommand(Constants.middleElevatorTargetPosition, elevator));
-  // down.onTrue(new
-  // SetElevatorTargetCommand(Constants.bottomElevatorTargetPosition, elevator));
-  // bumperLeft.onTrue(new
-  // SetElevatorTargetCommand(Constants.substationPickupElevatorTargetPosition,
-  // elevator));
+                // Configure the button bindings
+                configurePrimaryBindings();
+                configureSecondaryBindings();
 
-  // bumperRight.onTrue(new SetClawThresholdOverrideCommand(true, elevator));
-  // bumperRight.onFalse(new SetClawThresholdOverrideCommand(false, elevator));
+                instance = this;
 
-  // triggerLeft.onTrue(new SetElevatorTargetOverrideCommand(true, elevator));
-  // triggerLeft.onFalse(new SetElevatorTargetOverrideCommand(false, elevator));
+                // shuffleboard.addBoolean("NavX Calibrate", () ->
+                // swerveDrive.yawGyro.isCalibrating());
+                // shuffleboard.addBoolean("NavX Connected", () ->
+                // swerveDrive.yawGyro.isConnected());
+        }
 
-  // start.onTrue(new
-  // SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION, elevator));
+        /**
+         * Use this method to define your button->command mappings. Buttons can be
+         * created by
+         * instantiating a {@link GenericHID} or one of its subclasses
+         * ({@link edu.wpi.first.wpilibj.Joystick} or {@link XboxController}), and then
+         * passing it
+         * to a {@link edu.wpi.first.wpilibj2.command.button.JoystickButton}.
+         */
+        private void configurePrimaryBindings() {
+                primaryController = new Joystick(0);
 
-  // shuffleboard.addBoolean("Test", () -> Robot.isTest);
-  // if(Robot.isTest) {
-  // x.onTrue(new SetElevatorTargetCommand(Constants.middleElevatorTargetPosition,
-  // true, elevator)
-  // .andThen(new SetElevatorTargetCommand(Constants.carryElevatorPos, true,
-  // elevator))
-  // .andThen(new SetElevatorTargetCommand(Constants.middleElevatorTargetPosition,
-  // true, elevator))
-  // .andThen(new SetElevatorTargetCommand(Constants.carryElevatorPos, true,
-  // elevator))
-  // .andThen(new SetElevatorTargetCommand(Constants.middleElevatorTargetPosition,
-  // true, elevator))
-  // .andThen(new SetElevatorTargetCommand(Constants.carryElevatorPos, true,
-  // elevator))
-  // .andThen(new SetElevatorTargetCommand(Constants.middleElevatorTargetPosition,
-  // true, elevator))
-  // .andThen(new SetElevatorTargetCommand(Constants.carryElevatorPos, true,
-  // elevator))
-  // .andThen(new SetElevatorTargetCommand(Constants.middleElevatorTargetPosition,
-  // true,
-  // elevator)));
-  // }
-  // }
+                JoystickButton a = new JoystickButton(primaryController,
+                                LogitechControllerButtons.a);
+                JoystickButton b = new JoystickButton(primaryController,
+                                LogitechControllerButtons.b);
+                JoystickButton x = new JoystickButton(primaryController,
+                                LogitechControllerButtons.x);
+                JoystickButton y = new JoystickButton(primaryController,
+                                LogitechControllerButtons.y);
+                JoystickButton bumperLeft = new JoystickButton(primaryController,
+                                LogitechControllerButtons.bumperLeft);
+                JoystickButton bumperRight = new JoystickButton(primaryController,
+                                LogitechControllerButtons.bumperRight);
+                JoystickButton triggerLeft = new JoystickButton(primaryController,
+                                LogitechControllerButtons.triggerLeft);
+                JoystickButton triggerRight = new JoystickButton(primaryController,
+                                LogitechControllerButtons.triggerRight);
+                // JoystickButton up = new
+                // JoystickButton(primaryController,LogitechControllerButtons.up);
+                // JoystickButton down = new
+                // JoystickButton(primaryController,LogitechControllerButtons.down);
+                // JoystickButton left = new
+                // JoystickButton(primaryController,LogitechControllerButtons.left);
+                // JoystickButton right = new
+                // JoystickButton(primaryController,LogitechControllerButtons.right);
 
-  // enum PossibleAutos {
-  // NORMAL_AUTO,
-  // CHARGE_STATION_AUTO,
-  // }
+                swerveDrive
+                                // vertical axis of left joystick -> translation
+                                .setDefaultCommand(new TeleopSwerveCommand(swerveDrive,
+                                                () -> -primaryController.getY(),
+                                                () -> -primaryController.getX(), // horizontal
+                                                                                 // axis
+                                                                                 // of
+                                                                                 // left
+                                                                                 // joystick->
+                                                                                 // strafe
+                                                // we want horizontal of right stick, if not twist,
+                                                // then change
+                                                () -> primaryController.getTwist(),
+                                                () -> triggerLeft.getAsBoolean(),
+                                                () -> triggerRight.getAsBoolean()
+                                /*
+                                 * ()->y.getAsBoolean() owen doesn't want a button to turn
+                                 * field-relative off
+                                 */
+                                ));
 
-  // private final Command normalAuto = new SetElevatorTargetCommand(
-  // Constants.middleElevatorTargetPosition, true, elevator)
-  // .andThen(new ClawGrabberCommand( Value.kForward,clawIntake,true))
-  // .andThen(new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION,
-  // true, elevator))
-  // .andThen(new DriveDistanceAuto(Constants.BALANCE_DISTANCE, swerveDrive));
+                x.onTrue(new InstantCommand(() -> {
+                        swerveDrive.zeroGyro();
+                        swerveDrive.gyroOffset = 0;
+                }));
+                y.onTrue(new InstantCommand(() -> {
+                        for (SwerveModule mod : swerveDrive.mSwerveMods)
+                                mod.resetToAbsolute();
+                }));
 
-  // private final Command chargeStationAuto = new SetElevatorTargetCommand(
-  // Constants.topElevatorTargetPosition, true, elevator)
-  // .andThen(new ClawGrabberCommand( Value.kForward,clawIntake, true))
-  // .andThen(new SetElevatorTargetCommand( Constants.MINIMUM_ELEVATOR_POSITION,
-  // true, elevator))
-  // .andThen(new DriveDistanceAuto(Constants.BALANCE_DISTANCE, swerveDrive));
+                a.onTrue(new InstantCommand(() -> {
+                        boolean invert = SmartDashboard.getBoolean("Invert Serve", false);
+                        invert = !invert;
+                        swerveDrive.setAngleOffsets(invert);
+                        SmartDashboard.putBoolean("Invert Swerve", invert);
+                }));
+                b.onTrue(new InstantCommand(() -> {
+                        swerveDrive.setGyro(180);
+                }));
+        }
 
-  // private final Command driveBackAuto = new
-  // DriveDistanceAuto(Constants.BALANCE_DISTANCE,
-  // swerveDrive);
+        private void configureSecondaryBindings() {
+                secondaryController = new Joystick(1);
 
-  // private final Command openThenDriveAuto = new
-  // ClawGrabberCommand(Value.kForward, clawIntake,
-  // true)
-  // .andThen(new DriveDistanceAuto(Constants.BALANCE_DISTANCE, swerveDrive));
+                elevator.setDefaultCommand(new MoveElevatorCommand(
+                                () -> -secondaryController.getY(), elevator));
 
-  // private final Command openClaw = new ClawGrabberCommand(Value.kReverse,
-  // clawIntake, true);
+                JoystickButton a = new JoystickButton(secondaryController,
+                                LogitechControllerButtons.a);
+                JoystickButton b = new JoystickButton(secondaryController,
+                                LogitechControllerButtons.b);
+                JoystickButton x = new JoystickButton(secondaryController,
+                                LogitechControllerButtons.x);
+                JoystickButton y = new JoystickButton(secondaryController,
+                                LogitechControllerButtons.y);
+                JoystickButton bumperLeft = new JoystickButton(secondaryController,
+                                LogitechControllerButtons.bumperLeft);
+                JoystickButton bumperRight = new JoystickButton(secondaryController,
+                                LogitechControllerButtons.bumperRight);
+                JoystickButton triggerLeft = new JoystickButton(secondaryController,
+                                LogitechControllerButtons.triggerLeft);
+                JoystickButton triggerRight = new JoystickButton(secondaryController,
+                                LogitechControllerButtons.triggerRight);
+                POVButton up = new POVButton(secondaryController, LogitechControllerButtons.up);
+                POVButton down = new POVButton(secondaryController, LogitechControllerButtons.down);
+                POVButton left = new POVButton(secondaryController, LogitechControllerButtons.left);
+                ;
+                POVButton right = new POVButton(secondaryController,
+                                LogitechControllerButtons.right);
+                JoystickButton start = new JoystickButton(secondaryController,
+                                LogitechControllerButtons.start);
 
-  // private final Command overThenBalanceAuto = new
-  // DriveDistanceAuto(Constants.OVER_CHARGESTATION_DISTANCE, swerveDrive)
-  // .andThen(new DriveDistanceAuto(Constants.RETURN_TO_CHARGESTATION_DISTANCE,
-  // swerveDrive));
+                a.whileTrue(new ClawGrabberCommand(Value.kForward, clawIntake, true));
+                b.whileTrue(new ClawGrabberCommand(Value.kReverse, clawIntake, false));
+                // new IntakeMotorCommand( () -> bumperRight.getAsBoolean(),clawIntake);
 
-  // private final Command highBalance =
-  // new SetElevatorTargetCommand(Constants.topElevatorTargetPosition, true,
-  // elevator)
-  // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
-  // .andThen(new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION,
-  // true, elevator))
-  // .andThen(new DriveDistanceAuto(Constants.BALANCE_DISTANCE, swerveDrive));
+                up.onTrue(new SetElevatorTargetCommand(Constants.topElevatorTargetPosition,
+                                elevator));
+                left.onTrue(new SetElevatorTargetCommand(Constants.carryElevatorPos, elevator));
+                right.onTrue(new SetElevatorTargetCommand(Constants.middleElevatorTargetPosition,
+                                elevator));
+                down.onTrue(new SetElevatorTargetCommand(Constants.bottomElevatorTargetPosition,
+                                elevator));
+                bumperLeft.onTrue(new SetElevatorTargetCommand(
+                                Constants.substationPickupElevatorTargetPosition, elevator));
 
-  // private final Command midBalance =
-  // new SetElevatorTargetCommand(Constants.middleElevatorTargetPosition, true,
-  // elevator)
-  // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
-  // .andThen(new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION,
-  // true, elevator))
-  // .andThen(new DriveDistanceAuto(Constants.BALANCE_DISTANCE, swerveDrive));
+                bumperRight.onTrue(new SetClawThresholdOverrideCommand(true, elevator));
+                bumperRight.onFalse(new SetClawThresholdOverrideCommand(false, elevator));
 
-  // private final Command backOut = new DriveDistanceAuto(50000 *
-  // Constants.normalAutoDriveBackDistance, swerveDrive);
+                triggerLeft.onTrue(new SetElevatorTargetOverrideCommand(true, elevator));
+                triggerLeft.onFalse(new SetElevatorTargetOverrideCommand(false, elevator));
 
-  // private final Command lowBalance =
-  // new SetElevatorTargetCommand(Constants.bottomElevatorTargetPosition, true,
-  // elevator)
-  // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
-  // .andThen(new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION,
-  // true, elevator))
-  // .andThen(new DriveDistanceAuto(Constants.BALANCE_DISTANCE, swerveDrive));
+                start.onTrue(new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION,
+                                elevator));
 
-  // private final Command highBack =
-  // new SetElevatorTargetCommand(Constants.topElevatorTargetPosition, true,
-  // elevator)
-  // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
-  // .andThen(new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION,
-  // true, elevator))
-  // .andThen(new DriveDistanceAuto(Constants.normalAutoDriveBackDistance,
-  // swerveDrive));
+                shuffleboard.addBoolean("Test", () -> Robot.isTest);
+                if (Robot.isTest) {
+                        x.onTrue(new SetElevatorTargetCommand(
+                                        Constants.middleElevatorTargetPosition, true, elevator)
+                                        .andThen(new SetElevatorTargetCommand(
+                                                        Constants.carryElevatorPos,
+                                                        true, elevator))
+                                        .andThen(new SetElevatorTargetCommand(
+                                                        Constants.middleElevatorTargetPosition,
+                                                        true, elevator))
+                                        .andThen(new SetElevatorTargetCommand(
+                                                        Constants.carryElevatorPos,
+                                                        true, elevator))
+                                        .andThen(new SetElevatorTargetCommand(
+                                                        Constants.middleElevatorTargetPosition,
+                                                        true, elevator))
+                                        .andThen(new SetElevatorTargetCommand(
+                                                        Constants.carryElevatorPos,
+                                                        true, elevator))
+                                        .andThen(new SetElevatorTargetCommand(
+                                                        Constants.middleElevatorTargetPosition,
+                                                        true, elevator))
+                                        .andThen(new SetElevatorTargetCommand(
+                                                        Constants.carryElevatorPos,
+                                                        true, elevator))
+                                        .andThen(new SetElevatorTargetCommand(
+                                                        Constants.middleElevatorTargetPosition,
+                                                        true, elevator)));
+                }
+        }
 
-  // private final Command midBack =
-  // new SetElevatorTargetCommand(Constants.middleElevatorTargetPosition, true,
-  // elevator)
-  // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
-  // .andThen(new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION,
-  // true, elevator))
-  // .andThen(new DriveDistanceAuto(Constants.normalAutoDriveBackDistance,
-  // swerveDrive));
+        // enum PossibleAutos
+        // {
+        // NORMAL_AUTO,
+        // CHARGE_STATION_AUTO
+        // }
 
-  // private final Command lowBack =
-  // new SetElevatorTargetCommand(Constants.bottomElevatorTargetPosition, true,
-  // elevator)
-  // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
-  // .andThen(new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION,
-  // true, elevator))
-  // .andThen(new DriveDistanceAuto(50000 * Constants.normalAutoDriveBackDistance,
-  // swerveDrive));
+        private final Command exitCommunityAuto = new InstantCommand(() -> {
+                swerveDrive.resetOdometry(new Pose2d(new Translation2d(0, 0), new Rotation2d(0)));
+        }).andThen(new ClawGrabberCommand(Value.kReverse, clawIntake, false))
+                        .andThen(new SetElevatorTargetCommand(Constants.topElevatorTargetPosition,
+                                        true, elevator))
+                        .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
+                        .andThen(new SetElevatorTargetCommand(Constants.carryElevatorPos, true,
+                                        elevator))
+                        .andThen(new GoodDriveDistanceAuto(Constants.EXIT_COMMUNITY_DISTANCE, -0.4,
+                                        swerveDrive));
 
-  // SendableChooser<Command> autoChooser = new SendableChooser<>();
+        private final Command chargeStationAuto = new InstantCommand(() -> {
+                swerveDrive.resetOdometry(new Pose2d(new Translation2d(0, 0), new Rotation2d(0)));
+        }).andThen(new ClawGrabberCommand(Value.kReverse, clawIntake, false))
+                        .andThen(new SetElevatorTargetCommand(Constants.topElevatorTargetPosition,
+                                        true, elevator))
+                        .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
+                        .andThen(new SetElevatorTargetCommand(Constants.carryElevatorPos, true,
+                                        elevator))
+                        .andThen(new GoodDriveDistanceAuto(
+                                        Constants.EXIT_COMMUNITY_CHARGE_STATION_DISTANCE, -0.4,
+                                        swerveDrive))
+                        .andThen(new GoodDriveDistanceAuto(
+                                        Constants.RETURN_TO_CHARGE_STATION_DISTANCE, 0.4,
+                                        swerveDrive));
+        // .andThen(new AutoBalanceAuto(swerveDrive));
 
-  // autoChooser.setDefaultOption("High Balance", highBalance);
-  // autoChooser.addOption("Open, then Drive Back", openThenDriveAuto);
-  // autoChooser.addOption("Normal", normalAuto);
-  // autoChooser.addOption("Charge Station", chargeStationAuto);
-  // autoChooser.addOption("Drive Back", driveBackAuto);
-  // autoChooser.addOption("Over, then Balance", overThenBalanceAuto);
-  // autoChooser.addOption("High Back Out", highBack);
-  // autoChooser.addOption("Mid Balance", midBalance);
-  // autoChooser.addOption("Mid Back Out", midBack);
-  // autoChooser.addOption("Low Balance", lowBalance);
-  // autoChooser.addOption("Low Back Out", lowBack);
+        // // Old autos below
 
-  // shuffleboard.add(autoChooser);
-  // }
+        // private final Command driveBackAuto = new
+        // DriveDistanceAuto(Constants.BALANCE_DISTANCE,
+        // swerveDrive);
 
-  // /**
-  // * Use this to pass the autonomous command to the main {@link Robot} class.
-  // *
-  // * @return the command to run in autonomous
-  // */
-  // public Command getAutonomousCommand() {
-  // // An ExampleCommand will run in autonomous
-  // Command choice = autoChooser.getSelected();
-  // // choice.schedule();
-  // return choice;
+        // private final Command openThenDriveAuto = new
+        // ClawGrabberCommand(Value.kForward, clawIntake,
+        // true)
+        // .andThen(new DriveDistanceAuto(Constants.BALANCE_DISTANCE, swerveDrive));
 
-  // }
+        // private final Command openClaw = new ClawGrabberCommand(Value.kReverse,
+        // clawIntake, true);
+
+        // private final Command overThenBalanceAuto = new DriveDistanceAuto(
+        // Constants.OVER_CHARGESTATION_DISTANCE, swerveDrive)
+        // .andThen(new DriveDistanceAuto(Constants.RETURN_TO_CHARGESTATION_DISTANCE,
+        // swerveDrive));
+
+        // private final Command highBalance = new SetElevatorTargetCommand(
+        // Constants.topElevatorTargetPosition, true, elevator)
+        // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
+        // .andThen(
+        // new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION, true,
+        // elevator))
+        // .andThen(new DriveDistanceAuto(Constants.BALANCE_DISTANCE, swerveDrive));
+
+        // private final Command midBalance = new SetElevatorTargetCommand(
+        // Constants.middleElevatorTargetPosition, true, elevator)
+        // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
+        // .andThen(
+        // new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION, true,
+        // elevator))
+        // .andThen(new DriveDistanceAuto(Constants.BALANCE_DISTANCE, swerveDrive));
+
+        // private final Command backOut = new DriveDistanceAuto(
+        // 50000 * Constants.normalAutoDriveBackDistance, swerveDrive);
+
+        // private final Command lowBalance = new SetElevatorTargetCommand(
+        // Constants.bottomElevatorTargetPosition, true, elevator)
+        // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
+        // .andThen(
+        // new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION, true,
+        // elevator))
+        // .andThen(new DriveDistanceAuto(Constants.BALANCE_DISTANCE, swerveDrive));
+
+        // private final Command highBack = new
+        // SetElevatorTargetCommand(Constants.topElevatorTargetPosition,
+        // true, elevator)
+        // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
+        // .andThen(
+        // new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION, true,
+        // elevator))
+        // .andThen(new DriveDistanceAuto(Constants.normalAutoDriveBackDistance,
+        // swerveDrive));
+
+        // private final Command midBack = new SetElevatorTargetCommand(
+        // Constants.middleElevatorTargetPosition, true, elevator)
+        // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
+        // .andThen(
+        // new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION, true,
+        // elevator))
+        // .andThen(new DriveDistanceAuto(Constants.normalAutoDriveBackDistance,
+        // swerveDrive));
+
+        // private final Command lowBack = new SetElevatorTargetCommand(
+        // Constants.bottomElevatorTargetPosition, true, elevator)
+        // .andThen(new ClawGrabberCommand(Value.kForward, clawIntake, true))
+        // .andThen(
+        // new SetElevatorTargetCommand(Constants.MINIMUM_ELEVATOR_POSITION, true,
+        // elevator))
+        // .andThen(
+        // new DriveDistanceAuto(50000 * Constants.normalAutoDriveBackDistance,
+        // swerveDrive));
+
+        /**
+         * Use this to pass the autonomous command to the main {@link Robot} class.
+         *
+         * @return the command to run in autonomous
+         */
+        public Command getAutonomousCommand() {
+                // An ExampleCommand will run in autonomous
+                Command choice = autoChooser.getSelected();
+                // choice.schedule();
+                return choice;
+
+        }
 }
